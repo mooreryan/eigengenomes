@@ -1,3 +1,4 @@
-lsa
-lsa.dSYM
+eigg
+eigg.dSYM
 test_files
+*.o
