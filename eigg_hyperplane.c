@@ -2,14 +2,16 @@
 
 #include <stdlib.h>
 
-static double rand_real()
+static double
+rand_real()
 {
   /* TODO switch to random(4) for better random-ness? */
   return (double) rand() / (double) RAND_MAX;
 }
 
 /* random hyperplane through the origin */
-static double* hyperplane_init(int num_coef)
+static double*
+hyperplane_init(int num_coef)
 {
   double* hyperplane = malloc(num_coef * sizeof(double));
 
@@ -33,13 +35,16 @@ static double* hyperplane_init(int num_coef)
   return hyperplane;
 }
 
-static void hyperplane_destroy(double* hyperplane)
+static void
+hyperplane_destroy(double* hyperplane)
 {
   free(hyperplane);
 }
 
 /* num_coef is normally the kmer len */
-double** eigg_hyperplane_ary_init(int num_hyperplanes, int num_coef)
+double**
+eigg_hyperplane_ary_init(int num_hyperplanes,
+                         int num_coef)
 {
   int i = 0;
 
@@ -52,7 +57,9 @@ double** eigg_hyperplane_ary_init(int num_hyperplanes, int num_coef)
   return hyperplane_ary;
 }
 
-void eigg_hyperplane_ary_destroy(double** hyperplane_ary, int num_hyperplanes)
+void
+eigg_hyperplane_ary_destroy(double** hyperplane_ary,
+                            int num_hyperplanes)
 {
   int i = 0;
 
