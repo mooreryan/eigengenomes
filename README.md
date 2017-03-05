@@ -20,7 +20,7 @@ sudo mv eigg /usr/local/bin
 
 ### Uninstall
 
-In the source directory, run `make clean`.
+In the source directory, run `make clean`. Also, if you moved the `eigg` program binary, you will need to manually remove it.
 
 ## Usage
 
