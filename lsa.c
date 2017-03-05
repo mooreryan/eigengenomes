@@ -5,7 +5,7 @@
 
 #include "kseq.h"
 
-#define VERSION "0.0.1"
+#define VERSION "0.1"
 
 KSEQ_INIT(gzFile, gzread)
 
@@ -42,21 +42,13 @@ double
 hash_encoded_kmer(double** hyperplanes,
                   int      num_hyperplanes,
                   double*  encoded_kmer,
-                  int      kmer_len)
+                  int      kmer_len,
+                  double*  pow2)
 {
   int     hyperplane_i = 0;
   int     kmer_i = 0;
   double* this_hyperplane;
-
-
-
-  double silly = 0.0;
-
-
-  double pow2[num_hyperplanes];
-  for (int i = 0; i < num_hyperplanes; ++i) {
-    pow2[i] = pow(i, 2);
-  }
+  double hash_val = 0.0;
 
   for (hyperplane_i = 0; hyperplane_i < num_hyperplanes; ++hyperplane_i) {
     this_hyperplane = hyperplanes[hyperplane_i];
@@ -71,7 +63,7 @@ hash_encoded_kmer(double** hyperplanes,
     sum = sum - (encoded_kmer[kmer_i] * this_hyperplane[kmer_i]);
 
     if (sum > 0) {
-      silly += pow2[hyperplane_i];
+      hash_val += pow2[hyperplane_i];
     }
 
     /* if (sum > 0) { */
@@ -81,7 +73,7 @@ hash_encoded_kmer(double** hyperplanes,
     /* } */
   }
 
-  return silly;
+  return hash_val;
 }
 
 double* encode_ary_init()
@@ -329,6 +321,11 @@ int main(int argc, char* argv[])
   /* Total bins = 2^num_hyperplanes */
   num_hyperplanes = strtol(argv[3], NULL, 10);
 
+  double* pow2 = malloc(num_hyperplanes * sizeof(double));
+  for (int i = 0; i < num_hyperplanes; ++i) {
+    pow2[i] = pow(2, i);
+  }
+
   seq = kseq_init(fp);
   hyperplanes = hyperplane_ary_init(num_hyperplanes, kmer_len);
   encode_nt   = encode_ary_init();
@@ -390,7 +387,8 @@ int main(int argc, char* argv[])
       hashed_kmer = hash_encoded_kmer(hyperplanes,
                                       num_hyperplanes,
                                       encoded_kmer,
-                                      kmer_len);
+                                      kmer_len,
+                                      pow2);
 
       hashed_rev_kmers[i] = hashed_kmer;
     }
@@ -404,7 +402,8 @@ int main(int argc, char* argv[])
       hashed_kmer = hash_encoded_kmer(hyperplanes,
                                       num_hyperplanes,
                                       encoded_kmer,
-                                      kmer_len);
+                                      kmer_len,
+                                      pow2);
 
       hashed_for_kmers[i] = hashed_kmer;
     }
@@ -441,6 +440,7 @@ int main(int argc, char* argv[])
   hyperplane_ary_destroy(hyperplanes, num_hyperplanes);
   free(encoded_kmer);
   encode_ary_destroy(encode_nt);
+  free(pow2);
 
   return 0;
 }
