@@ -1,11 +1,9 @@
-eigg
-eigg.dSYM
-test_files_old
+*.dSYM
 *.o
-wrappers
-weight_counts
-weight_counts.dSYM
+eigg
 hash_and_count
-hash_and_count.dSYM
+test_files_old
 tommy_test
-tommy_test.dSYM
+weight_counts
+weight_counts_old.c
+wrappers

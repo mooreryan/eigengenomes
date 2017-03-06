@@ -2,16 +2,17 @@ CC = gcc
 CFLAGS = -Wall -g -O2
 LSA_FLAGS = -lz -lm
 OBJS = eigg_encode.o eigg_hash.o eigg_hyperplane.o eigg_kmers.o \
-       eigg_print.o vendor/tommyarray.o vendor/tommyhashlin.o
+       eigg_print.o
+TOMMY_OBJS = vendor/tommyarray.o vendor/tommyhashlin.o
 
 .PHONY: all
 all: hash_and_count weight_counts
 
-hash_and_count: $(OBJS)
+hash_and_count: $(OBJS) $(TOMMY_OBJS)
 	$(CC) $(CFLAGS) $(LSA_FLAGS) -o $@ $^ $@.c
 
-weight_counts:
-	$(CC) $(CFLAGS) -lm -o $@ $@.c
+weight_counts: $(TOMMY_OBJS)
+	$(CC) $(CFLAGS) -lm -o $@ $^ $@.c
 
 vendor/tommyarray:
 	$(CC) $(CFLAGS) -c -o $@.o $@.c

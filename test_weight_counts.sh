@@ -25,12 +25,13 @@ valgrind ./weight_counts $num_hps test_files/*.hash.counts > test_out
 
 diff test_out test_weight_counts.expected_output
 
-echo
 if [ $? -ne 0 ]
 then
+    echo
     echo "The output hash changed!"
     diff -y test_out test_weight_counts.expected_output
 else
+    echo
     echo "It is all good!"
 fi
 

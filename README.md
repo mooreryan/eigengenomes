@@ -59,7 +59,7 @@ Aaaand, the remaining steps aren't finished yet ;)
 - 2: Couldn't open a file
 - 3: Not an even number of forward and reverse reads
 - 4: A sequnece is shorter than the kmer length
-- 5: A hashed kmer bucket was missing from the counting hash
+- 5: A hashed kmer bucket was missing from a counting hash
 
 ## Issues
 

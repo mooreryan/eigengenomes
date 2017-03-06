@@ -334,7 +334,7 @@ int main(int argc, char* argv[])
   /* fprintf(stderr, "\n"); */
 
   /* print kmer counts: outfile is hash_bucket count */
-  unsigned long count = 0;
+  /* unsigned long count = 0; */
   fprintf(stdout,
           "%lu\n",
           num_hash_buckets);
