@@ -1,5 +1,7 @@
 #include "eigg_hash.h"
 
+#include <math.h>
+
 double
 eigg_hash_encoded_kmer(double** hyperplanes,
                        int      num_hyperplanes,
@@ -35,5 +37,5 @@ eigg_hash_encoded_kmer(double** hyperplanes,
     /* } */
   }
 
-  return hash_val;
+  return round(hash_val);
 }

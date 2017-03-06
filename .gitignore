@@ -1,4 +1,10 @@
 eigg
 eigg.dSYM
-test_files
+test_files_old
 *.o
+wrappers
+weight_counts
+weight_counts.dSYM
+test_weight_counts.sh
+hash_and_count
+hash_and_count.dSYM

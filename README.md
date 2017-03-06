@@ -12,23 +12,45 @@ cd eigengenomes
 make
 ```
 
-This will make the executable file `eigg`. You can move this to somewhere on your path now. E.g.,
-
-```bash
-sudo mv eigg /usr/local/bin
-```
+This will make the executable files needed for the pipeline.
 
 ### Uninstall
 
-In the source directory, run `make clean`. Also, if you moved the `eigg` program binary, you will need to manually remove it.
+In the source directory, run `make clean`. Also, if you moved any of the program binaries, you will need to manually remove them.
 
 ## Usage
 
-The `eigg` program takes four command line arguments, and writes to standard out.
+Run `hash_and_count` for each fastq file. It assumes reads are paired.
 
 ```
-Usage: ./eigg <1: seed> <2: kmer size> <3: number of hyperplanes> <4: seqs.fastq> > out.hashq
+Usage: ./hash_and_count <1: seed> <2: kmer size> <3: number of hyperplanes> <4: seqs.fastq> > seqs.hash_counts
 ```
+
+Run `weight_counts` once on all the output files from the `hash_and_count` program.
+
+```
+Usage: ./weight_counts <1: num hyperplanes used in previous step> *.hash_bucket_counts > cool_sample_group.hash_counts
+```
+
+## Example
+
+There aren't wrapper scripts yet, but here is an example of running the steps implemented thus far.
+
+`test_files` contains `s1.fastq` and `s2.fastq`.
+
+This command will hash the kmers and count them. It will create these files: `test_files/s{1,2}.hash_counts`.
+
+```bash
+parallel "./hash_and_count 0 3 4 {} > {.}.hash_counts" ::: test_files/*fastq
+```
+
+This command will weight the counts using something similar to `tf-idf` weighting. It will create the file `test_files/all.hash_counts`.
+
+```bash
+./weight_counts 4 test_files/*.hash_counts > test_files/all.hash_counts
+```
+
+Aaaand, the remaining steps aren't finished yet ;)
 
 ## Error codes
 

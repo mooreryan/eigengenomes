@@ -10,8 +10,7 @@
 #include "eigg_hyperplane.h"
 #include "eigg_kmers.h"
 #include "eigg_print.h"
-
-#define VERSION "0.1"
+#include "eigg_version.h"
 
 KSEQ_INIT(gzFile, gzread)
 
@@ -61,7 +60,8 @@ int main(int argc, char* argv[])
     fprintf(stderr,
             "VERSION: %s\nUsage: %s "
             "<1: seed> <2: kmer size> "
-            "<3: number of hyperplanes> <4: seqs.fastq>\n",
+            "<3: number of hyperplanes> <4: seqs.fastq> "
+            "> seqs.hash_counts\n",
             VERSION,
             argv[0]);
 
@@ -78,12 +78,21 @@ int main(int argc, char* argv[])
   seed = strtol(argv[1], NULL, 10);
   srand(seed);
 
+  /* TODO toss out the first few random values */
+
   kmer_len = strtol(argv[2], NULL, 10);
 
   encoded_kmer = malloc(kmer_len * sizeof(double));
 
   /* Total bins = 2^num_hyperplanes */
   num_hyperplanes = strtol(argv[3], NULL, 10);
+
+
+  unsigned long num_hash_buckets =
+    (unsigned long)pow(2, num_hyperplanes);
+
+  unsigned long* hashed_kmer_counts =
+    calloc(num_hash_buckets, sizeof(unsigned long));
 
   double* pow2 = malloc(num_hyperplanes * sizeof(double));
   for (int i = 0; i < num_hyperplanes; ++i) {
@@ -111,8 +120,8 @@ int main(int argc, char* argv[])
     }
 
     num_seqs += 2;
-    if ((num_seqs % 1000) == 0) {
-      fprintf(stderr, "LOG -- reading: %lu\r", num_seqs);
+    if ((num_seqs % 1000) == 0 && num_seqs != 0) {
+      fprintf(stderr, "LOG -- reading seqs: %lu\r", num_seqs);
     }
 
     if (strlen(s1_seq) < kmer_len) { /* the sequence is too short for the
@@ -135,28 +144,18 @@ int main(int argc, char* argv[])
       return 4;
     }
 
-    struct Kmers* for_kmers = eigg_kmers_new(s1_seq, s1_seq_len, kmer_len);
-    double* hashed_for_kmers = malloc(for_kmers->num_kmers * sizeof(double));
+    struct Kmers* for_kmers =
+      eigg_kmers_new(s1_seq, s1_seq_len, kmer_len);
+    double* hashed_for_kmers =
+      malloc(for_kmers->num_kmers * sizeof(double));
 
     /* the rev read might be different lenght */
-    struct Kmers* rev_kmers = eigg_kmers_new(seq->seq.s, seq->seq.l, kmer_len);
-    double* hashed_rev_kmers = malloc(rev_kmers->num_kmers * sizeof(double));
+    struct Kmers* rev_kmers =
+      eigg_kmers_new(seq->seq.s, seq->seq.l, kmer_len);
+    double* hashed_rev_kmers =
+      malloc(rev_kmers->num_kmers * sizeof(double));
 
-    for (i = 0; i < rev_kmers->num_kmers; ++i) {
-      eigg_encode_kmer(encoded_kmer,
-                       encode_nt,
-                       rev_kmers->kmers[i],
-                       kmer_len);
-
-      hashed_kmer = eigg_hash_encoded_kmer(hyperplanes,
-                                           num_hyperplanes,
-                                           encoded_kmer,
-                                           kmer_len,
-                                           pow2);
-
-      hashed_rev_kmers[i] = hashed_kmer;
-    }
-
+    /* hash kmers for forward read */
     for (i = 0; i < for_kmers->num_kmers; ++i) {
       eigg_encode_kmer(encoded_kmer,
                        encode_nt,
@@ -169,26 +168,61 @@ int main(int argc, char* argv[])
                                            kmer_len,
                                            pow2);
 
+      ++hashed_kmer_counts[(unsigned long)hashed_kmer];
+
       hashed_for_kmers[i] = hashed_kmer;
     }
 
-    eigg_print_hashed_record(s1_name,
-                             s1_seq,
-                             s1_qual,
-                             kmer_len,
-                             for_kmers->num_kmers,
-                             rev_kmers->num_kmers,
-                             hashed_for_kmers,
-                             hashed_rev_kmers);
+    /* hash kmers for reverse read */
+    for (i = 0; i < rev_kmers->num_kmers; ++i) {
+      eigg_encode_kmer(encoded_kmer,
+                       encode_nt,
+                       rev_kmers->kmers[i],
+                       kmer_len);
 
-    eigg_print_hashed_record(seq->name.s,
-                             seq->seq.s,
-                             seq->qual.s,
-                             kmer_len,
-                             for_kmers->num_kmers,
-                             rev_kmers->num_kmers,
-                             hashed_for_kmers,
-                             hashed_rev_kmers);
+      hashed_kmer = eigg_hash_encoded_kmer(hyperplanes,
+                                           num_hyperplanes,
+                                           encoded_kmer,
+                                           kmer_len,
+                                           pow2);
+
+      ++hashed_kmer_counts[(unsigned long)hashed_kmer];
+
+      hashed_rev_kmers[i] = hashed_kmer;
+    }
+
+
+    /* each read pair will have a all the kmers of its partner catted
+       together with its own */
+
+    /* eigg_print_hashed_record(s1_name, */
+    /*                          s1_seq, */
+    /*                          s1_qual, */
+    /*                          kmer_len, */
+    /*                          for_kmers->num_kmers, */
+    /*                          rev_kmers->num_kmers, */
+    /*                          hashed_for_kmers, */
+    /*                          hashed_rev_kmers); */
+
+    /* eigg_print_hashed_record(seq->name.s, */
+    /*                          seq->seq.s, */
+    /*                          seq->qual.s, */
+    /*                          kmer_len, */
+    /*                          for_kmers->num_kmers, */
+    /*                          rev_kmers->num_kmers, */
+    /*                          hashed_for_kmers, */
+    /*                          hashed_rev_kmers); */
+
+    /* for (unsigned long i = 0; i < for_kmers->num_kmers; ++i) { */
+    /*   fprintf(stdout, */
+    /*           "%lu\n", */
+    /*           (unsigned long)hashed_for_kmers[i]); */
+    /* } */
+    /* for (unsigned long i = 0; i < rev_kmers->num_kmers; ++i) { */
+    /*   fprintf(stdout, */
+    /*           "%lu\n", */
+    /*           (unsigned long)hashed_rev_kmers[i]); */
+    /* } */
 
     free(hashed_rev_kmers);
     free(hashed_for_kmers);
@@ -198,6 +232,30 @@ int main(int argc, char* argv[])
     eigg_kmers_destroy(rev_kmers);
     eigg_kmers_destroy(for_kmers);
   }
+  /* fprintf(stderr, "\n"); */
+
+  /* print kmer counts */
+  unsigned long count = 0;
+  fprintf(stdout,
+          "%lu\n",
+          num_hash_buckets);
+  for (unsigned long i = 0; i < num_hash_buckets; ++i) {
+    if ((i % 100000000) == 0 && i != 0 ) {
+      count += 100;
+      fprintf(stderr,
+              "LOG -- processing hash bin counts: %lu million\r",
+              count);
+    }
+
+    if (hashed_kmer_counts[i] != 0) {
+      fprintf(stdout,
+              "%lu %lu\n",
+              i,
+              hashed_kmer_counts[i]);
+    }
+  }
+  /* fprintf(stderr, "\n"); */
+
 
   kseq_destroy(seq);
   gzclose(fp);
@@ -205,6 +263,7 @@ int main(int argc, char* argv[])
   free(encoded_kmer);
   eigg_encode_ary_destroy(encode_nt);
   free(pow2);
+  free(hashed_kmer_counts);
 
   return 0;
 }
