@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-double
+unsigned long
 eigg_hash_encoded_kmer(double** hyperplanes,
                        int      num_hyperplanes,
                        double*  encoded_kmer,
@@ -37,5 +37,5 @@ eigg_hash_encoded_kmer(double** hyperplanes,
     /* } */
   }
 
-  return round(hash_val);
+  return (unsigned long)round(hash_val);
 }
