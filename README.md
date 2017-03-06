@@ -59,3 +59,16 @@ Aaaand, the remaining steps aren't finished yet ;)
 - 2: Couldn't open a file
 - 3: Not an even number of forward and reverse reads
 - 4: A sequnece is shorter than the kmer length
+
+## Issues
+
+### TODO
+
+- The counting arrays are way to memory intensive, consider hash tables for counting.
+- Nucleotides are being mapped to 5 different integers instead of complex numbers.
+
+### Differences from the original progam
+
+- Hyperplanes are drawn at random through the origin rather than based on existing kmers.
+- The idf score is calculated a bit differently.
+- It is not designed to be run across many nodes of a compute cluster. This may change.
