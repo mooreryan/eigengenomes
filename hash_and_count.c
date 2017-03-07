@@ -402,5 +402,16 @@ int main(int argc, char* argv[])
   free(pow2);
   /* free(hashed_kmer_counts); */
 
+  for (tommy_size_t s = 0; s < tommy_array_size(hash_bucket_names); ++s) {
+    free(tommy_array_get(hash_bucket_names, s));
+  }
+  tommy_array_done(hash_bucket_names);
+  free(hash_bucket_names);
+
+  tommy_hashlin_foreach(hash_bucket_counts,
+                        free);
+  tommy_hashlin_done(hash_bucket_counts);
+  free(hash_bucket_counts);
+
   return 0;
 }
