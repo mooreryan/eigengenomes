@@ -7,6 +7,44 @@
 #include "vendor/tommyarray.h"
 #include "vendor/tommyhashlin.h"
 
+struct sphb_item_t {
+  unsigned long hash_bucket;
+  unsigned int* samples;
+  unsigned long num_samples;
+
+  tommy_node node;
+};
+
+struct sphb_item_t*
+sphb_item_create(unsigned long hash_bucket,
+                 unsigned long num_samples)
+{
+  struct sphb_item_t* sphb_item =
+    malloc(sizeof(struct sphb_item_t));
+  assert(sphb_item != NULL);
+
+  sphb_item->hash_bucket = hash_bucket;
+
+  unsigned int* samples =
+    malloc(num_samples * sizeof(int));
+
+  for (unsigned long i = 0; i < num_samples; ++i) {
+    samples[i] = 0;
+  }
+
+  sphb_item->samples = samples;
+  sphb_item->num_samples = num_samples;
+
+  return sphb_item;
+}
+
+void
+sphb_item_destroy(struct sphb_item_t* sphb_item)
+{
+  free(sphb_item->samples);
+  free(sphb_item);
+}
+
 struct item_t {
   unsigned long key;
   double val;
@@ -63,15 +101,17 @@ int main(int argc, char *argv[])
   }
 
   /* to hold the tommy_hashlin_search() return vals */
-  struct item_t* item = malloc(sizeof(struct item_t));
+  struct item_t* item;
+
+  struct sphb_item_t* sphb_item;
 
   unsigned long hash_bucket = 0;
   unsigned long count = 0;
   unsigned long hash_bucket_count = 0;
   unsigned long i = 0;
-  unsigned long j = 0;
+  unsigned long s_i = 0;
+  unsigned long hb_i = 0;
 
-  unsigned long val = 0;
   double weighted_count = 0.0;
   double weight = 0.0;
   unsigned long non_zero_samples = 0;
@@ -86,36 +126,33 @@ int main(int argc, char *argv[])
   FILE** infiles = malloc(num_samples * sizeof(FILE*));
   assert(infiles != NULL);
 
-  /* TODO these use way too much memory, consider using a hash table
-     for counting instead */
-  /* unsigned long* per_sample_hash_bucket_counts = */
-  /*   malloc(num_samples * num_hash_buckets * sizeof(unsigned long)); */
 
+  /* each sample hash its own counting hash to track the number of
+     kmers assigned to each hash bucket */
   tommy_hashlin** per_sample_hash_bucket_counts
     = malloc(num_samples * sizeof(tommy_hashlin*));
   assert(per_sample_hash_bucket_counts != NULL);
-  for (i = 0; i < num_samples; ++i) {
-    per_sample_hash_bucket_counts[i]
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    per_sample_hash_bucket_counts[s_i]
       = malloc(sizeof(tommy_hashlin));
+    assert(per_sample_hash_bucket_counts[s_i] != NULL);
 
-    tommy_hashlin_init(per_sample_hash_bucket_counts[i]);
+    tommy_hashlin_init(per_sample_hash_bucket_counts[s_i]);
   }
 
-  unsigned long* samples_per_hash_bucket =
-    malloc(num_hash_buckets * num_samples * sizeof(unsigned long));
-
-  for (i = 0; i < num_samples * num_hash_buckets; ++i) {
-    /* per_sample_hash_bucket_counts[i] = 0; */
-    samples_per_hash_bucket[i] = 0;
-  }
+  /* for each hash bucket, track how many samples had a least one kmer
+     in this hash bucket */
+  tommy_hashlin* samples_per_hash_bucket =
+    malloc(sizeof(tommy_hashlin));
+  assert(samples_per_hash_bucket != NULL);
+  tommy_hashlin_init(samples_per_hash_bucket);
 
   double* l2_norms =
     malloc(num_samples * sizeof(double));
 
-  for (i = 0; i < num_samples; ++i) {
-    l2_norms[i] = 0.0;
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    l2_norms[s_i] = 0.0;
   }
-
 
   tommy_array* hash_bucket_names
     = malloc(sizeof(tommy_array));
@@ -134,59 +171,87 @@ int main(int argc, char *argv[])
     }
   }
 
-  for (i = 0; i < num_samples; ++i) {
-    fscanf(infiles[i],
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    fscanf(infiles[s_i],
            "%lu",
            &num_hash_buckets);
 
-    l2_norms[i] = 0.0;
+    l2_norms[s_i] = 0.0;
 
     /* TODO ensure that num_hash_buckets is the same for all files */
 
-    /* i is sample idx */
-    while (fscanf(infiles[i], "%lu %lu", &hash_bucket, &count) == 2) {
+    /* read all lines in this sample file */
+    while (fscanf(infiles[s_i], "%lu %lu", &hash_bucket, &count) == 2) {
       /* TODO check and see if this sample's hash bucket name has been
          seen before */
       struct item_t* new_item = malloc(sizeof(struct item_t));
       new_item->key = hash_bucket;
       new_item->val = count;
-      tommy_hashlin_insert(per_sample_hash_bucket_counts[i],
+      tommy_hashlin_insert(per_sample_hash_bucket_counts[s_i],
                            &new_item->node,
                            new_item,
                            tommy_inthash_u64(new_item->key));
 
       /* val = ary_2d_get_at(per_sample_hash_bucket_counts, */
-      /*                     i, */
+      /*                     s_i, */
       /*                     hash_bucket, */
       /*                     num_hash_buckets); */
 
       /* ary_2d_set_at(per_sample_hash_bucket_counts, */
-      /*               i, */
+      /*               s_i, */
       /*               hash_bucket, */
       /*               num_hash_buckets, */
       /*               val + count); */
 
-      l2_norms[i] += (count * count);
-      ary_2d_set_at(samples_per_hash_bucket,
-                    hash_bucket,
-                    i,
-                    num_samples,
-                    1);
+      l2_norms[s_i] += (count * count);
+
+      /* TODO could this be combined with the previous hash? */
+
+      sphb_item = tommy_hashlin_search(samples_per_hash_bucket,
+                                       item_compare,
+                                       &hash_bucket,
+                                       tommy_inthash_u64(hash_bucket));
+      if (sphb_item) { /* has been seen */
+        /* this hashbucket has been seen in this sample */
+        sphb_item->samples[s_i] = 1;
+      } else {
+        struct sphb_item_t* new_sphb_item =
+          sphb_item_create(hash_bucket, num_samples);
+
+        /* this hashbucket has been seen in this sample */
+        new_sphb_item->samples[s_i] = 1;
+
+        tommy_hashlin_insert(samples_per_hash_bucket,
+                             &new_sphb_item->node,
+                             new_sphb_item,
+                             tommy_inthash_u64(new_sphb_item->hash_bucket));
+      }
     }
 
     /* see kmer abundance matrix section of the paper */
-    l2_norms[i] = sqrt(l2_norms[i]) / sqrt(num_hash_buckets);
+    l2_norms[s_i] = sqrt(l2_norms[s_i]) / sqrt(num_hash_buckets);
   }
 
   /* see kmer abundance matrix section of the paper */
-  for (i = 0; i < num_hash_buckets; ++i) {
+  for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) {
     non_zero_samples = 0;
     hash_bucket_sample_weight = 0.0;
-    for (j = 0; j < num_samples; ++j) {
-      val = ary_2d_get_at(samples_per_hash_bucket, i, j, num_samples);
+    for (s_i = 0; s_i < num_samples; ++s_i) {
+      /* val = ary_2d_get_at(samples_per_hash_bucket, hb_i, s_i, num_samples); */
 
-      if (val > 0) {
-        ++non_zero_samples;
+      sphb_item = tommy_hashlin_search(samples_per_hash_bucket,
+                                       item_compare,
+                                       &hb_i,
+                                       tommy_inthash_u64(hb_i));
+
+      if (!sphb_item) {
+        /* fprintf(stderr, */
+        /*         "WARN -- hash bucket %lu was not found in sphb hash\n", */
+        /*         hb_i); */
+      } else {
+        if (sphb_item->samples[s_i] == 1) {
+          ++non_zero_samples;
+        }
       }
     }
 
@@ -201,12 +266,12 @@ int main(int argc, char *argv[])
       /* insert it into the tracking array */
       unsigned long* hash_bucket_name = malloc(sizeof(unsigned long));
       assert(hash_bucket_name != NULL);
-      hash_bucket_name[0] = i;
+      hash_bucket_name[0] = hb_i;
       tommy_array_insert(hash_bucket_names, hash_bucket_name);
 
       /* insert it into the hash table */
       struct item_t* new_item = malloc(sizeof(struct item_t));
-      new_item->key = i;
+      new_item->key = hb_i;
       new_item->val = hash_bucket_sample_weight;
 
       tommy_hashlin_insert(hash_bucket_sample_weights,
@@ -215,51 +280,51 @@ int main(int argc, char *argv[])
                            tommy_inthash_u64(new_item->key));
     }
 
-    /* hash_bucket_sample_weights[i] = hash_bucket_sample_weight; */
+    /* hash_bucket_sample_weights[hb_i] = hash_bucket_sample_weight; */
   }
 
   fprintf(stdout,
           "%lu %lu\n",
           num_samples,
           num_hash_buckets);
-  for (i = 0; i < num_samples; ++i) {
-    for (j = 0; j < num_hash_buckets; ++j) {
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) {
       /* log normalization of tf count... TOOD not in original, better
          of worse? */
       /* hash_bucket_count = */
       /*   1 + log2(ary_2d_get_at(per_sample_hash_bucket_counts, */
-      /*                          i, */
-      /*                          j, */
+      /*                          s_i, */
+      /*                          hb_i, */
       /*                          num_hash_buckets)); */
 
-      item = tommy_hashlin_search(per_sample_hash_bucket_counts[i],
+      item = tommy_hashlin_search(per_sample_hash_bucket_counts[s_i],
                                   item_compare,
-                                  &j,
-                                  tommy_inthash_u64(j));
+                                  &hb_i,
+                                  tommy_inthash_u64(hb_i));
       if (!item) {
-        fprintf(stderr,
-                "WARN -- hash bucket %lu was not found in pshbc hash\n",
-                j);
+        /* fprintf(stderr, */
+        /*         "WARN -- hash bucket %lu was not found in pshbc hash\n", */
+        /*         hb_i); */
 
         /* return 5; */
       } else {
         hash_bucket_count = (unsigned long)round(item->val);
 
         /* hash_bucket_count = ary_2d_get_at(per_sample_hash_bucket_counts, */
-        /*                                   i, */
-        /*                                   j, */
+        /*                                   s_i, */
+        /*                                   hb_i, */
         /*                                   num_hash_buckets); */
 
         if (hash_bucket_count != 0) {
           /* get the sample weight */
           item = tommy_hashlin_search(hash_bucket_sample_weights,
                                       item_compare,
-                                      &j,
-                                      tommy_inthash_u64(j));
+                                      &hb_i,
+                                      tommy_inthash_u64(hb_i));
           if (!item) {
             fprintf(stderr,
                     "ERROR -- hash bucket %lu was not found in weight hash\n",
-                    j);
+                    hb_i);
 
             return 5;
           } else {
@@ -268,34 +333,46 @@ int main(int argc, char *argv[])
             hash_bucket_sample_weight = item->val;
           }
 
-          weight = hash_bucket_sample_weight / l2_norms[i];
+          weight = hash_bucket_sample_weight / l2_norms[s_i];
           weighted_count = hash_bucket_count * weight;
           fprintf(stdout,
                   "%lu %lu %.5f\n",
-                  i,
-                  j,
+                  s_i,
+                  hb_i,
                   weighted_count);
         }
       }
     }
   }
 
-  for (i = 0; i < num_samples; ++i) {
-    fclose(infiles[i]);
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    fclose(infiles[s_i]);
   }
   free(infiles);
+
+  tommy_hashlin_foreach(samples_per_hash_bucket,
+                        (tommy_foreach_func*)sphb_item_destroy);
+  tommy_hashlin_done(samples_per_hash_bucket);
   free(samples_per_hash_bucket);
+
   free(l2_norms);
 
+  for (tommy_count_t s = 0; s < tommy_array_size(hash_bucket_names); ++s) {
+    free(tommy_array_get(hash_bucket_names, s));
+  }
   tommy_array_done(hash_bucket_names);
   free(hash_bucket_names);
+
+  tommy_hashlin_foreach(hash_bucket_sample_weights,
+                        free);
   tommy_hashlin_done(hash_bucket_sample_weights);
   free(hash_bucket_sample_weights);
-  free(item);
 
-  for (i = 0; i < num_samples; ++i) {
-    tommy_hashlin_done(per_sample_hash_bucket_counts[i]);
-    free(per_sample_hash_bucket_counts[i]);
+  for (s_i = 0; s_i < num_samples; ++s_i) {
+    tommy_hashlin_foreach(per_sample_hash_bucket_counts[s_i],
+                          free); /* APPLE is this the correct free func? */
+    tommy_hashlin_done(per_sample_hash_bucket_counts[s_i]);
+    free(per_sample_hash_bucket_counts[s_i]);
 
     /* TODO free the elements of the hash? */
   }

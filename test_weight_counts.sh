@@ -30,6 +30,7 @@ then
     echo
     echo "The output hash changed!"
     diff -y test_out test_weight_counts.expected_output
+    exit 1
 else
     echo
     echo "It is all good!"
