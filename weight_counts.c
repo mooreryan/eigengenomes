@@ -178,12 +178,6 @@ int main(int argc, char *argv[])
   }
 
   for (s_i = 0; s_i < num_samples; ++s_i) {
-    fprintf(stderr,
-            "Reading and tracking sample: %lu of %lu = %.2f%%\r",
-            s_i+1,
-            num_samples,
-            (s_i+1) / (double)num_samples * 100);
-
     fscanf(infiles[s_i],
            "%lu",
            &num_hash_buckets);
@@ -195,6 +189,15 @@ int main(int argc, char *argv[])
     /* read all lines in this sample file */
     line = 0;
     while (fscanf(infiles[s_i], "%lu %lu", &hash_bucket, &count) == 2) {
+      if ((++line % 1000000) == 0) {
+        fprintf(stderr,
+                "Reading and tracking sample %lu of %lu = %.2f%%, line #%lu\r",
+                s_i+1,
+                num_samples,
+                (s_i+1) / (double)num_samples * 100,
+                line);
+      }
+
       /* TODO check and see if this sample's hash bucket name has been
          seen before */
       struct item_t* new_item = malloc(sizeof(struct item_t));

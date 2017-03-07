@@ -8,7 +8,7 @@ num_hps=4
 rm test_files/s?.hash.*
 
 echo;echo "Running hash_and_count"
-parallel "echo;echo;valgrind ./hash_and_count 0 $kmer_len $num_hps {} > {.}.hash.counts" ::: test_files/*fastq
+parallel "echo;echo;valgrind ./hash_and_count 0 $kmer_len $num_hps {} > {.}.hash.counts" ::: test_files/s?.fastq
 
 diff <(sort test_files/s1.hash.counts) <(sort hash_and_count.s1.expected)
 if [ $? -ne 0 ]
@@ -25,7 +25,7 @@ then
 fi
 
 echo;echo "Running weight_counts"
-valgrind ./weight_counts $num_hps test_files/*.hash.counts > test_out
+valgrind ./weight_counts $num_hps test_files/s?.hash.counts > test_out
 
 diff <(sort test_out) <(sort test_weight_counts.expected_output)
 

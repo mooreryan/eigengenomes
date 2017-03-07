@@ -3,6 +3,7 @@
 eigg
 hash_and_count
 test_files_old
+test_files/seqs.*
 tommy_test
 weight_counts
 weight_counts_old.c
