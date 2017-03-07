@@ -27,17 +27,20 @@ fi
 echo;echo "Running weight_counts"
 valgrind ./weight_counts $num_hps test_files/*.hash.counts > test_out
 
-diff test_out test_weight_counts.expected_output
+diff <(sort test_out) <(sort test_weight_counts.expected_output)
 
 if [ $? -ne 0 ]
 then
     echo
     echo "The output hash changed!"
-    diff -y test_out test_weight_counts.expected_output
+    diff -y <(sort test_out) <(sort test_weight_counts.expected_output)
     exit 1
 else
     echo
     echo "It is all good!"
 fi
 
+echo;echo "Ouput is:"
+echo
+cat test_out
 rm test_out

@@ -89,7 +89,7 @@ double l2_norm(unsigned long* ary, unsigned long len)
 
 int main(int argc, char *argv[])
 {
-  if (argc <= 3) {
+  if (argc <= 2) {
     fprintf(stderr,
             "VERSION: %s\nUsage: %s "
             "<1: num hyperplanes used in previous step> "
@@ -109,8 +109,14 @@ int main(int argc, char *argv[])
   unsigned long count = 0;
   unsigned long hash_bucket_count = 0;
   unsigned long i = 0;
+  unsigned long line = 0;
   unsigned long s_i = 0;
   unsigned long hb_i = 0;
+
+  unsigned long* hash_bucket_name;
+
+  unsigned long actual_num_hash_buckets = 0;
+  unsigned long s = 0;
 
   double weighted_count = 0.0;
   double weight = 0.0;
@@ -172,6 +178,12 @@ int main(int argc, char *argv[])
   }
 
   for (s_i = 0; s_i < num_samples; ++s_i) {
+    fprintf(stderr,
+            "Reading and tracking sample: %lu of %lu = %.2f%%\r",
+            s_i+1,
+            num_samples,
+            (s_i+1) / (double)num_samples * 100);
+
     fscanf(infiles[s_i],
            "%lu",
            &num_hash_buckets);
@@ -181,6 +193,7 @@ int main(int argc, char *argv[])
     /* TODO ensure that num_hash_buckets is the same for all files */
 
     /* read all lines in this sample file */
+    line = 0;
     while (fscanf(infiles[s_i], "%lu %lu", &hash_bucket, &count) == 2) {
       /* TODO check and see if this sample's hash bucket name has been
          seen before */
@@ -215,6 +228,13 @@ int main(int argc, char *argv[])
         /* this hashbucket has been seen in this sample */
         sphb_item->samples[s_i] = 1;
       } else {
+        /* insert hash bucket into the tracking array */
+        hash_bucket_name = malloc(sizeof(unsigned long));
+        assert(hash_bucket_name != NULL);
+        hash_bucket_name[0] = hash_bucket;
+        tommy_array_insert(hash_bucket_names, hash_bucket_name);
+
+
         struct sphb_item_t* new_sphb_item =
           sphb_item_create(hash_bucket, num_samples);
 
@@ -231,9 +251,30 @@ int main(int argc, char *argv[])
     /* see kmer abundance matrix section of the paper */
     l2_norms[s_i] = sqrt(l2_norms[s_i]) / sqrt(num_hash_buckets);
   }
+  fprintf(stderr, "\n");
 
   /* see kmer abundance matrix section of the paper */
-  for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) {
+  actual_num_hash_buckets = tommy_array_size(hash_bucket_names);
+  fprintf(stderr,
+          "INFO -- possible hash buckets: %lu, actual hash buckets: %lu, "
+          "%.5f%% of possible\n",
+          num_hash_buckets,
+          actual_num_hash_buckets,
+          actual_num_hash_buckets / (double)num_hash_buckets * 100);
+
+  for (s = 0; s < actual_num_hash_buckets; ++s) {
+    hash_bucket_name = (unsigned long*)tommy_array_get(hash_bucket_names, s);
+    hb_i = hash_bucket_name[0];
+  /* for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) { */
+
+    if ((s % 1000000) == 0) {
+      fprintf(stderr,
+              "Global weighting counts -- %lu of %lu = %.2f%%\r",
+              s,
+              actual_num_hash_buckets,
+              s / (double) actual_num_hash_buckets * 100);
+    }
+
     non_zero_samples = 0;
     hash_bucket_sample_weight = 0.0;
     for (s_i = 0; s_i < num_samples; ++s_i) {
@@ -263,12 +304,6 @@ int main(int argc, char *argv[])
       hash_bucket_sample_weight =
         log2(1 + (num_samples  / (double)non_zero_samples));
 
-      /* insert it into the tracking array */
-      unsigned long* hash_bucket_name = malloc(sizeof(unsigned long));
-      assert(hash_bucket_name != NULL);
-      hash_bucket_name[0] = hb_i;
-      tommy_array_insert(hash_bucket_names, hash_bucket_name);
-
       /* insert it into the hash table */
       struct item_t* new_item = malloc(sizeof(struct item_t));
       new_item->key = hb_i;
@@ -282,13 +317,31 @@ int main(int argc, char *argv[])
 
     /* hash_bucket_sample_weights[hb_i] = hash_bucket_sample_weight; */
   }
+  fprintf(stderr,
+          "Global weighting counts -- %lu of %lu = %.2f%%\n",
+          s,
+          actual_num_hash_buckets,
+          s / (double) actual_num_hash_buckets * 100);
 
   fprintf(stdout,
           "%lu %lu\n",
           num_samples,
           num_hash_buckets);
   for (s_i = 0; s_i < num_samples; ++s_i) {
-    for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) {
+    for (s = 0; s < actual_num_hash_buckets; ++s) {
+      hash_bucket_name = (unsigned long*)tommy_array_get(hash_bucket_names, s);
+      hb_i = hash_bucket_name[0];
+
+    /* for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) { */
+      if ((s % 1000000) == 0) {
+        fprintf(stderr,
+                "Final weighting counts, sample %lu -- %lu of %lu = %.2f%%\r",
+                s_i,
+                s,
+                actual_num_hash_buckets,
+                s / (double) actual_num_hash_buckets * 100);
+      }
+
       /* log normalization of tf count... TOOD not in original, better
          of worse? */
       /* hash_bucket_count = */
@@ -343,7 +396,15 @@ int main(int argc, char *argv[])
         }
       }
     }
+    fprintf(stderr,
+            "Final weighting counts, sample %lu -- %lu of %lu = %.2f%%\n",
+            s_i,
+            s,
+            actual_num_hash_buckets,
+            s / (double) actual_num_hash_buckets * 100);
   }
+
+  fprintf(stderr, "Cleaning up!\n");
 
   for (s_i = 0; s_i < num_samples; ++s_i) {
     fclose(infiles[s_i]);
@@ -357,7 +418,7 @@ int main(int argc, char *argv[])
 
   free(l2_norms);
 
-  for (tommy_count_t s = 0; s < tommy_array_size(hash_bucket_names); ++s) {
+  for (s = 0; s < tommy_array_size(hash_bucket_names); ++s) {
     free(tommy_array_get(hash_bucket_names, s));
   }
   tommy_array_done(hash_bucket_names);
@@ -378,7 +439,6 @@ int main(int argc, char *argv[])
   }
   free(per_sample_hash_bucket_counts);
 
-  /* TODO free the items in hash_bucket_names and hash_bucket_sample_weights */
-
+  fprintf(stderr, "Finished %s!\n", argv[0]);
   return 0;
 }
