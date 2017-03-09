@@ -6,10 +6,13 @@ OBJS = eigg_encode.o eigg_hash.o eigg_hyperplane.o eigg_kmers.o \
 TOMMY_OBJS = vendor/tommyarray.o vendor/tommyhashlin.o vendor/tommylist.o
 
 .PHONY: all
-all: hash_and_count weight_counts
+all: hash_and_count weight_counts map_mm
 
 hash_and_count: $(OBJS) $(TOMMY_OBJS)
 	$(CC) $(CFLAGS) $(LSA_FLAGS) -o $@ $^ $@.c
+
+make_mm:
+	$(CC) $(CFLAGS) -o $@ $@.c
 
 weight_counts: $(TOMMY_OBJS)
 	$(CC) $(CFLAGS) -lm -o $@ $^ $@.c

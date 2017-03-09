@@ -2,8 +2,10 @@
 *.o
 eigg
 hash_and_count
+map_mm
 test_files_old
 test_files/seqs.*
+test_files/*gensim*
 test.py
 tommy_test
 weight_counts

@@ -37,7 +37,29 @@ then
     exit 1
 fi
 
-python lsi.py test_files test_out.mm test_files/s?.hash.counts
+echo;echo "Running map_mm"
+valgrind ./map_mm < test_out.mm 1> test_out.mapped.mm 2> test_out.hb_map
+
+diff test_out.mapped.mm test_out.mapped.mm.expected
+if [ $? -ne 0 ]
+then
+    echo
+    echo "The output of map_mm hash changed!"
+    exit 1
+fi
+
+# grep out the valgrind output
+diff <(grep -v "==" test_out.hb_map) test_out.hb_map.expected
+if [ $? -ne 0 ]
+then
+    echo
+    echo "The stderr of map_mm hash changed!"
+    exit 1
+fi
+
+
+echo;echo "Running lsi.py"
+python lsi.py test_files test_out.mapped.mm test_files/s?.hash.counts
 if [ $? -ne 0 ]
 then
     echo "Something went wrong in the lsi.py step"
@@ -61,4 +83,4 @@ fi
 echo;echo "It's all good!"
 echo;echo
 
-rm test_out.mm test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim
+rm test_out.mm test_out.mapped.mm test_out.hb_map test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim

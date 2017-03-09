@@ -365,9 +365,10 @@ int main(int argc, char *argv[])
           actual_num_hash_buckets,
           s / (double) actual_num_hash_buckets * 100);
 
-  fprintf(stdout, "%%%%MatrixMarket matrix coordinate real general\n");
+  /* fprintf(stdout, "%%%%MatrixMarket matrix coordinate real general\n"); */
   fprintf(stdout,
-          "%lu %lu %lu\n",
+          "%lu %lu %lu %lu\n",
+          actual_num_hash_buckets,
           num_hash_buckets,
           num_samples,
           total_entries);
