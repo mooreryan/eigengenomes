@@ -335,9 +335,12 @@ int main(int argc, char* argv[])
 
   /* print kmer counts: outfile is hash_bucket count */
   /* unsigned long count = 0; */
+
+  /* rows, colums, entries */
   fprintf(stdout,
-          "%lu\n",
-          num_hash_buckets);
+          "1 %lu %lu\n",
+          num_hash_buckets,
+          num_seen_hash_buckets);
   /* for (unsigned long i = 0; i < num_hash_buckets; ++i) { */
   /*   if ((i % 100000000) == 0 && i != 0 ) { */
   /*     count += 100; */
@@ -372,6 +375,8 @@ int main(int argc, char* argv[])
     if (hb_name) { /* the hash_bucket is in the hash */
       assert(hb_name[0] == hash_bucket_count->hash_bucket);
 
+      /* sort of like the matrix market format, except the row is not
+         printed because we wont know the row until the next step. */
       fprintf(stdout,
               "%lu %lu\n",
               hb_name[0],

@@ -4,6 +4,7 @@ eigg
 hash_and_count
 test_files_old
 test_files/seqs.*
+test.py
 tommy_test
 weight_counts
 weight_counts_old.c

@@ -25,22 +25,40 @@ then
 fi
 
 echo;echo "Running weight_counts"
-valgrind ./weight_counts $num_hps test_files/s?.hash.counts > test_out
+valgrind ./weight_counts $num_hps test_files/s?.hash.counts > test_out.mm
 
-diff <(sort test_out) <(sort test_weight_counts.expected_output)
+diff test_out.mm test_weight_counts.expected_output
 
 if [ $? -ne 0 ]
 then
     echo
     echo "The output hash changed!"
-    diff -y <(sort test_out) <(sort test_weight_counts.expected_output)
+    diff test_out.mm test_weight_counts.expected_output
     exit 1
-else
-    echo
-    echo "It is all good!"
 fi
 
-echo;echo "Ouput is:"
-echo
-cat test_out
-rm test_out
+python lsi.py test_files test_out.mm test_files/s?.hash.counts
+if [ $? -ne 0 ]
+then
+    echo "Something went wrong in the lsi.py step"
+    exit 1
+fi
+
+# diff test_files/kmer_lsi.gensim test_files/kmer_lsi.gensim.expected
+# if [ $? -ne 0 ]
+# then
+#     echo "The kmer_lsi.gensim file doesn't match!"
+#     exit 1
+# fi
+
+# diff test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim.projection.expected
+# if [ $? -ne 0 ]
+# then
+#     echo "The kmer_lsi.gensim.projection file doesn't match!"
+#     exit 1
+# fi
+
+echo;echo "It's all good!"
+echo;echo
+
+rm test_out.mm test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim

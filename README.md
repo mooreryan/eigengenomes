@@ -1,6 +1,6 @@
 # Eigengenomes
 
-A C implementation of Brian Cleary's [LSA](https://github.com/brian-cleary/LatentStrainAnalysis), for eigengenome partitioning.
+A C and Python implementation of Brian Cleary's [LSA](https://github.com/brian-cleary/LatentStrainAnalysis), for eigengenome partitioning.
 
 ## Install
 

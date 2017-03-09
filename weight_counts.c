@@ -4,8 +4,8 @@
 #include <stdlib.h>
 
 #include "eigg_version.h"
-#include "vendor/tommyarray.h"
 #include "vendor/tommyhashlin.h"
+#include "vendor/tommylist.h"
 
 struct sphb_item_t {
   unsigned long hash_bucket;
@@ -58,6 +58,29 @@ int item_compare(const void* arg, const void* item)
     ((const struct item_t*)item)->key;
 }
 
+struct lu_t {
+  long unsigned hash_bucket_name;
+  tommy_node node;
+};
+
+int lu_sort_func(const void* a, const void* b)
+{
+  unsigned long bucket_a = 0;
+  unsigned long bucket_b = 0;
+
+  bucket_a = ((struct lu_t*)a)->hash_bucket_name;
+  bucket_b = ((struct lu_t*)b)->hash_bucket_name;
+
+  if (bucket_a < bucket_b) {
+    return -1;
+  } else if (bucket_a == bucket_b) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+
 void ary_2d_set_at(unsigned long* ary,
                    unsigned long ridx,
                    unsigned long cidx,
@@ -105,6 +128,12 @@ int main(int argc, char *argv[])
 
   struct sphb_item_t* sphb_item;
 
+  unsigned long rows = 0;
+  unsigned long cols = 0;
+  unsigned long entries = 0;
+  unsigned long total_entries = 0;
+
+
   unsigned long hash_bucket = 0;
   unsigned long count = 0;
   unsigned long hash_bucket_count = 0;
@@ -113,10 +142,12 @@ int main(int argc, char *argv[])
   unsigned long s_i = 0;
   unsigned long hb_i = 0;
 
-  unsigned long* hash_bucket_name;
+  struct lu_t* hash_bucket_name;
 
   unsigned long actual_num_hash_buckets = 0;
   unsigned long s = 0;
+
+  tommy_node* thingy;
 
   double weighted_count = 0.0;
   double weight = 0.0;
@@ -131,7 +162,6 @@ int main(int argc, char *argv[])
 
   FILE** infiles = malloc(num_samples * sizeof(FILE*));
   assert(infiles != NULL);
-
 
   /* each sample hash its own counting hash to track the number of
      kmers assigned to each hash bucket */
@@ -160,10 +190,10 @@ int main(int argc, char *argv[])
     l2_norms[s_i] = 0.0;
   }
 
-  tommy_array* hash_bucket_names
-    = malloc(sizeof(tommy_array));
+  tommy_list* hash_bucket_names
+    = malloc(sizeof(tommy_list));
   assert(hash_bucket_names != NULL);
-  tommy_array_init(hash_bucket_names);
+  tommy_list_init(hash_bucket_names);
 
   tommy_hashlin* hash_bucket_sample_weights
     = malloc(sizeof(tommy_hashlin));
@@ -179,8 +209,11 @@ int main(int argc, char *argv[])
 
   for (s_i = 0; s_i < num_samples; ++s_i) {
     fscanf(infiles[s_i],
-           "%lu",
-           &num_hash_buckets);
+           "%lu %lu %lu",
+           &rows, &cols, &entries);
+    total_entries += entries;
+
+    num_hash_buckets = cols;
 
     l2_norms[s_i] = 0.0;
 
@@ -188,8 +221,11 @@ int main(int argc, char *argv[])
 
     /* read all lines in this sample file */
     line = 0;
-    while (fscanf(infiles[s_i], "%lu %lu", &hash_bucket, &count) == 2) {
-      if ((++line % 1000000) == 0) {
+    for (line = 0; line < entries; ++line) {
+
+      /* TODO check that the correct number of items are read */
+      fscanf(infiles[s_i], "%lu %lu", &hash_bucket, &count);
+      if ((line % 1000000) == 0) {
         fprintf(stderr,
                 "Reading and tracking sample %lu of %lu = %.2f%%, line #%lu\r",
                 s_i+1,
@@ -231,11 +267,12 @@ int main(int argc, char *argv[])
         /* this hashbucket has been seen in this sample */
         sphb_item->samples[s_i] = 1;
       } else {
-        /* insert hash bucket into the tracking array */
-        hash_bucket_name = malloc(sizeof(unsigned long));
+        /* insert hash bucket into the tracking list */
+        hash_bucket_name = malloc(sizeof(struct lu_t));
         assert(hash_bucket_name != NULL);
-        hash_bucket_name[0] = hash_bucket;
-        tommy_array_insert(hash_bucket_names, hash_bucket_name);
+        hash_bucket_name->hash_bucket_name = hash_bucket;
+        ++actual_num_hash_buckets;
+        tommy_list_insert_head(hash_bucket_names, &hash_bucket_name->node, hash_bucket_name);
 
 
         struct sphb_item_t* new_sphb_item =
@@ -257,7 +294,6 @@ int main(int argc, char *argv[])
   fprintf(stderr, "\n");
 
   /* see kmer abundance matrix section of the paper */
-  actual_num_hash_buckets = tommy_array_size(hash_bucket_names);
   fprintf(stderr,
           "INFO -- possible hash buckets: %lu, actual hash buckets: %lu, "
           "%.5f%% of possible\n",
@@ -265,10 +301,13 @@ int main(int argc, char *argv[])
           actual_num_hash_buckets,
           actual_num_hash_buckets / (double)num_hash_buckets * 100);
 
-  for (s = 0; s < actual_num_hash_buckets; ++s) {
-    hash_bucket_name = (unsigned long*)tommy_array_get(hash_bucket_names, s);
-    hb_i = hash_bucket_name[0];
-  /* for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) { */
+  thingy = tommy_list_head(hash_bucket_names);
+  s = 0;
+  while (thingy) {
+    ++s;
+    struct lu_t* lu = thingy->data; /* get the obj pointer */
+    hb_i = lu->hash_bucket_name;
+    thingy = thingy->next; /* go to the next element */
 
     if ((s % 1000000) == 0) {
       fprintf(stderr,
@@ -326,24 +365,37 @@ int main(int argc, char *argv[])
           actual_num_hash_buckets,
           s / (double) actual_num_hash_buckets * 100);
 
+  fprintf(stdout, "%%%%MatrixMarket matrix coordinate real general\n");
   fprintf(stdout,
-          "%lu %lu\n",
+          "%lu %lu %lu\n",
+          num_hash_buckets,
           num_samples,
-          num_hash_buckets);
-  for (s_i = 0; s_i < num_samples; ++s_i) {
-    for (s = 0; s < actual_num_hash_buckets; ++s) {
-      hash_bucket_name = (unsigned long*)tommy_array_get(hash_bucket_names, s);
-      hb_i = hash_bucket_name[0];
+          total_entries);
 
-    /* for (hb_i = 0; hb_i < num_hash_buckets; ++hb_i) { */
-      if ((s % 1000000) == 0) {
-        fprintf(stderr,
-                "Final weighting counts, sample %lu -- %lu of %lu = %.2f%%\r",
-                s_i,
-                s,
-                actual_num_hash_buckets,
-                s / (double) actual_num_hash_buckets * 100);
-      }
+
+  /* sort the output in hash bucket order. TODO could try making a map
+     from hash bucket name down to 0..actual_num_hash_buckets */
+  tommy_list_sort(hash_bucket_names, lu_sort_func);
+
+  thingy = tommy_list_head(hash_bucket_names);
+
+  /* print out info and do final weighting */
+  s = 0;
+  while (thingy) {
+    ++s;
+    struct lu_t* lu = thingy->data; /* get the obj pointer */
+    hb_i = lu->hash_bucket_name;
+    thingy = thingy->next; /* go to the next element */
+
+    if ((s % 1000000) == 0) {
+      fprintf(stderr,
+              "Final weighting counts, hash bucket %lu of %lu = %.2f%%\r",
+              s,
+              actual_num_hash_buckets,
+              s / (double) actual_num_hash_buckets * 100);
+    }
+
+    for (s_i = 0; s_i < num_samples; ++s_i) {
 
       /* log normalization of tf count... TOOD not in original, better
          of worse? */
@@ -391,21 +443,23 @@ int main(int argc, char *argv[])
 
           weight = hash_bucket_sample_weight / l2_norms[s_i];
           weighted_count = hash_bucket_count * weight;
+          /* the MatrixMarket format has 1-based indices...ie A[1,1]
+             is the first entry in Matrix A */
           fprintf(stdout,
                   "%lu %lu %.5f\n",
-                  s_i,
-                  hb_i,
+                  hb_i+1,
+                  s_i+1,
                   weighted_count);
         }
       }
     }
-    fprintf(stderr,
-            "Final weighting counts, sample %lu -- %lu of %lu = %.2f%%\n",
-            s_i,
-            s,
-            actual_num_hash_buckets,
-            s / (double) actual_num_hash_buckets * 100);
   }
+  fprintf(stderr,
+          "Final weighting counts, hash bucket %lu of %lu = %.2f%%\n",
+          s,
+          actual_num_hash_buckets,
+          s / (double) actual_num_hash_buckets * 100);
+
 
   fprintf(stderr, "Cleaning up!\n");
 
@@ -421,12 +475,6 @@ int main(int argc, char *argv[])
 
   free(l2_norms);
 
-  for (s = 0; s < tommy_array_size(hash_bucket_names); ++s) {
-    free(tommy_array_get(hash_bucket_names, s));
-  }
-  tommy_array_done(hash_bucket_names);
-  free(hash_bucket_names);
-
   tommy_hashlin_foreach(hash_bucket_sample_weights,
                         free);
   tommy_hashlin_done(hash_bucket_sample_weights);
@@ -441,6 +489,9 @@ int main(int argc, char *argv[])
     /* TODO free the elements of the hash? */
   }
   free(per_sample_hash_bucket_counts);
+
+  tommy_list_foreach(hash_bucket_names, free);
+  free(hash_bucket_names);
 
   fprintf(stderr, "Finished %s!\n", argv[0]);
   return 0;

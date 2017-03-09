@@ -3,7 +3,7 @@ CFLAGS = -Wall -g -O2
 LSA_FLAGS = -lz -lm
 OBJS = eigg_encode.o eigg_hash.o eigg_hyperplane.o eigg_kmers.o \
        eigg_print.o
-TOMMY_OBJS = vendor/tommyarray.o vendor/tommyhashlin.o
+TOMMY_OBJS = vendor/tommyarray.o vendor/tommyhashlin.o vendor/tommylist.o
 
 .PHONY: all
 all: hash_and_count weight_counts
