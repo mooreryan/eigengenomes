@@ -39,6 +39,7 @@ fi
 
 echo;echo "Running map_mm"
 valgrind ./map_mm < test_out.mm 1> test_out.mapped.mm 2> test_out.hb_map
+cat test_out.hb_map
 
 diff test_out.mapped.mm test_out.mapped.mm.expected
 if [ $? -ne 0 ]
@@ -57,30 +58,4 @@ then
     exit 1
 fi
 
-
-echo;echo "Running lsi.py"
-python lsi.py test_files test_out.mapped.mm test_files/s?.hash.counts
-if [ $? -ne 0 ]
-then
-    echo "Something went wrong in the lsi.py step"
-    exit 1
-fi
-
-# diff test_files/kmer_lsi.gensim test_files/kmer_lsi.gensim.expected
-# if [ $? -ne 0 ]
-# then
-#     echo "The kmer_lsi.gensim file doesn't match!"
-#     exit 1
-# fi
-
-# diff test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim.projection.expected
-# if [ $? -ne 0 ]
-# then
-#     echo "The kmer_lsi.gensim.projection file doesn't match!"
-#     exit 1
-# fi
-
-echo;echo "It's all good!"
-echo;echo
-
-rm test_out.mm test_out.mapped.mm test_out.hb_map test_files/kmer_lsi.gensim.projection test_files/kmer_lsi.gensim
+rm test_out.mm test_out.mapped.mm test_out.hb_map

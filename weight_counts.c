@@ -376,6 +376,8 @@ int main(int argc, char *argv[])
 
   /* sort the output in hash bucket order. TODO could try making a map
      from hash bucket name down to 0..actual_num_hash_buckets */
+  fprintf(stderr,
+          "Sorting hash bucket names\n");
   tommy_list_sort(hash_bucket_names, lu_sort_func);
 
   thingy = tommy_list_head(hash_bucket_names);

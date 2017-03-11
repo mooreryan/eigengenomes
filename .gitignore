@@ -1,6 +1,8 @@
+*.backup
 *.dSYM
 *.o
 eigg
+gensim_tutorial.py
 hash_and_count
 map_mm
 test_files_old
